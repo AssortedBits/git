@@ -1,0 +1,10 @@
+#!/bin/sh
+
+. $(dirname "${BASH_SOURCE[0]}")/gitclean
+
+git reset --hard
+
+git submodule foreach --recursive git reset --hard
+
+git submodule update --init --recursive
+

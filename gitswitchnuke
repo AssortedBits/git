@@ -1,0 +1,34 @@
+#!/bin/bash
+
+TARGET_BRANCH=$1
+if [[ $TARGET_BRANCH == "" ]]; then
+    echo "no target branch specified"
+    exit 1
+fi
+
+CURR_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+if [[ $? -ne 0 ]]; then
+    echo "error parsing current branch name"
+    exit 1
+fi
+
+if [[ $TARGET_BRANCH == $CURR_BRANCH ]]; then
+	echo "current and target branch names are the same"
+	exit 0
+fi
+
+printf "saved current branchname: "
+echo $CURR_BRANCH
+
+. $(dirname "${BASH_SOURCE[0]}")/gitnuke
+
+git switch "$TARGET_BRANCH"
+if [[ $? -ne 0 ]]; then
+    exit 1
+fi
+
+git branch -d $CURR_BRANCH
+if [[ $? -ne 0 ]]; then
+    exit 1
+fi
+

@@ -1,0 +1,6 @@
+#!/bin/bash
+
+branchname=$(git branch --show-current)
+gitfetch
+gitnuke
+git reset --hard origin/$branchname
