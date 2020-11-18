@@ -1,3 +1,10 @@
 #!/bin/bash
 
-git fetch --all -p -P --recurse-submodules
+#we don't know if the user has submodule.recurse enabled,
+# but (as of git 2.29) neither disabling it here (via -c submodule.recurse=0)
+# and passing --recurse-submodules, nor enabling it and refraining from passing
+# --recurse-submodules, prevents a redundant traversal.
+#I've left it at the latter, since if I had to guess which one would
+# be fixed first in Git, I'd bet that one.
+
+git -c submodule.recurse=1 fetch --all --tags -p -P

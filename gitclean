@@ -1,6 +1,12 @@
 #!/bin/sh
 
-git clean -xffd
+#`git clean` doesn't currently respect submodule.recurse,
+# but, for all we know, when Git adds support for this,
+# it'll cause redundant traversal
+# (as is the current (v2.29) situation with `fetch`).
+#So we disable it.
 
-git submodule foreach --recursive git clean -xffd
+git -c submodule.recurse=0 clean -xffd
+
+git -c submodule.recurse=0 submodule foreach --recursive git -c submodule.recurse=0 clean -xffd
 

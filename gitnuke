@@ -2,9 +2,12 @@
 
 . $(dirname "${BASH_SOURCE[0]}")/gitclean
 
-git reset --hard
+git -c submodule.recurse=1 reset --hard
 
-git submodule foreach --recursive git reset --hard
-
+# From my timing tests (v2.29), my guess is `git submodule update`
+# doesn't respect submodule.recurse.
+# Hopefully, if they change this in a later version, it won't cause
+# a redundant traversal to also specify --recursive (as is apparently
+# the situation with `fetch`).
 git submodule update --init --recursive
 
