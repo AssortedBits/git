@@ -7,4 +7,4 @@
 #I've left it at the latter, since if I had to guess which one would
 # be fixed first in Git, I'd bet that one.
 
-git -c submodule.recurse=1 fetch --all --tags -p -P
+git -c submodule.recurse=1 fetch --all --tags -p -P -j 4
