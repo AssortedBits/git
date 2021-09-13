@@ -1,0 +1,31 @@
+#!/bin/sh
+
+msg=$1
+if [ -z "$msg" ] ; then
+    echo "error: no commit message supplied"
+    exit 1
+fi
+
+gitrootdir=$(git rev-parse --show-toplevel)
+status=$?
+if [ $status -ne 0 ] ; then
+    echo "error"
+    exit $status
+fi
+
+git add $gitrootdir
+status=$?
+if [ $status -ne 0 ] ; then
+    echo "error"
+    exit $status
+fi
+
+git commit -m "$msg"
+status=$?
+if [ $status -ne 0 ] ; then
+    echo "error"
+    exit $status
+fi
+
+git push
+
