@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 #`git clean` doesn't currently respect submodule.recurse,
 # but, for all we know, when Git adds support for this,
