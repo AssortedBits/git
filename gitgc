@@ -1,0 +1,7 @@
+#!/bin/bash
+
+#It appears gc does not respect submodules.recurse, and I haven't checked whether reflog does.
+#To do: make this recursive.
+
+git reflog expire --expire-unreachable=now --all
+git gc --prune=now
