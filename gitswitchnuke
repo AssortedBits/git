@@ -22,10 +22,86 @@ echo $CURR_BRANCH
 
 . $(dirname "${BASH_SOURCE[0]}")/gitnuke
 
-git switch "$TARGET_BRANCH"
-if [[ $? -ne 0 ]]; then
-    exit 1
+git branch | grep -q " $TARGET_BRANCH"'$'
+if [[ $? -eq 0 ]]; then
+    git switch "$TARGET_BRANCH"
+    if [[ $? -ne 0 ]]; then
+        exit 1
+    fi
+else
+    #This indirect way of switching branches works-around a problem in Git
+    # involving branches with submodules that are new to the local repo.
+    git branch --remotes | grep -q " origin/$TARGET_BRANCH"'$'
+    if [[ $? -ne 0 ]]; then
+        echo "Did not find target branch $TARGET_BRANCH."
+        exit 1
+    fi
+
+    COMMON_ANCESTOR=$(git merge-base $CURR_BRANCH origin/$TARGET_BRANCH)
+    if [[ $? -ne 0 ]]; then
+        echo "Target branch $TARGET_BRANCH does not already exist locally,"
+        echo "  and our fetched history contains no common ancestor with origin/$TARGET_BRANCH."
+        echo "This script cannot handle such a nuanced case -- you're on your own."
+        exit 1
+    fi
+
+    #Create local branch pointing to our current commit, whatever that is.
+    git checkout -b $TARGET_BRANCH
+    if [[ $? -ne 0 ]]; then
+        exit 1
+    fi
+
+    function undoAndCleanupAndQuit {
+        git switch $CURR_BRANCH
+        if [[ $? -ne 0 ]]; then
+            echo "failed to switch back to your original branch."
+            echo "Aborting, and leaving you with a mess."
+            exit 1
+        fi
+        git branch -d $TARGET_BRANCH
+        if [[ $? -ne 0 ]]; then
+            echo "failed to clean up broken $TARGET_BRANCH."
+            echo "Aborting, and leaving you with a mess."
+            exit 1
+        fi
+        exit 1
+    }
+
+    #Tell it that its destiny is to be a proper checkout of its corresponding remote branch.
+    git branch --set-upstream-to=origin/$TARGET_BRANCH --quiet
+    if [[ $? -ne 0 ]]; then
+        echo "failed to set upstream to 'origin/$TARGET_BRANCH'"
+        undoAndCleanupAndQuit
+    fi
+    #Rewind it to the common ancestor between where we are and where we're going.
+    git reset --hard $COMMON_ANCESTOR --quiet
+    if [[ $? -ne 0 ]]; then
+        echo "failed reset to common ancestor (part of a work-around for a quirk of git submodules)"
+        undoAndCleanupAndQuit
+    fi
+
+    git merge --ff-only --quiet
+    if [[ $? -ne 0 ]]; then
+        echo "failed to fast-forward to tip of 'origin/$TARGET_BRANCH' (part of a work-around for a quirk of git submodules)"
+        undoAndCleanupAndQuit
+    fi
+    #Checkout appropriate version of submodules that Git's "laziness" has left out-of-sync.
+    for sm in $(git submodule status | grep "^+" | awk '{print $2}'); do
+        git checkout --quiet HEAD $sm
+        if [[ $? -ne 0 ]]; then
+            undoAndCleanupAndQuit
+        fi
+    done
+
+    #Init incoming submodules.
+    for sm in $(git submodule status | grep "^-" | awk '{print $2}'); do
+        git submodule update --init --recursive $sm
+        if [[ $? -ne 0 ]]; then
+            undoAndCleanupAndQuit
+        fi
+    done
 fi
+
 
 git branch -d $CURR_BRANCH
 if [[ $? -ne 0 ]]; then
