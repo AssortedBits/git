@@ -8,5 +8,5 @@
 
 git -c submodule.recurse=0 clean -xffd
 
-git -c submodule.recurse=0 submodule foreach --recursive git -c submodule.recurse=0 clean -xffd
+git -c submodule.recurse=0 submodule foreach --recursive --quiet git -c submodule.recurse=0 clean -xffd
 
