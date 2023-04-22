@@ -25,6 +25,12 @@ if [[ $? -ne 0 ]]; then
     exit 1
 fi
 
+#Makes sure URLs are correct -- Git is lazy about those.
+git submodule sync --recursive --quiet
+if [[ $? -ne 0 ]]; then
+    exit 1
+fi
+
 git branch -d $CURR_BRANCH
 if [[ $? -ne 0 ]]; then
     exit 1

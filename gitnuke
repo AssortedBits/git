@@ -4,10 +4,21 @@
 
 git -c submodule.recurse=1 reset --hard
 
+#Makes sure URLs are correct -- Git is lazy about those.
+git submodule sync --recursive --quiet
+if [[ $? -ne 0 ]]; then
+    exit 1
+fi
+
 # From my timing tests (v2.29), my guess is `git submodule update`
 # doesn't respect submodule.recurse.
 # Hopefully, if they change this in a later version, it won't cause
 # a redundant traversal to also specify --recursive (as is apparently
 # the situation with `fetch`).
-git submodule update --init --recursive
+for sm in $(git submodule status | grep "^-" | awk '{print $2}'); do
+    git submodule update --init --recursive $sm
+    if [[ $? -ne 0 ]]; then
+        undoAndCleanupAndQuit
+    fi
+done
 

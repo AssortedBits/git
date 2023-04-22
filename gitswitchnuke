@@ -17,17 +17,31 @@ if [[ $TARGET_BRANCH == $CURR_BRANCH ]]; then
 	exit 0
 fi
 
-printf "saved current branchname: "
-echo $CURR_BRANCH
-
 . $(dirname "${BASH_SOURCE[0]}")/gitnuke
 
+#The easy way.
 git branch | grep -q " $TARGET_BRANCH"'$'
-if [[ $? -eq 0 ]]; then
-    git switch "$TARGET_BRANCH"
+#I'm using zero (success) to mean "true" here.
+SIMPLE_SWITCH=$?
+
+function undoAndCleanupAndQuit {
+    git switch $CURR_BRANCH
     if [[ $? -ne 0 ]]; then
+        echo "failed to switch back to your original branch."
+        echo "Aborting, and leaving you with a mess."
         exit 1
     fi
+    git branch -d $TARGET_BRANCH
+    if [[ $? -ne 0 ]]; then
+        echo "failed to clean up broken $TARGET_BRANCH."
+        echo "Aborting, and leaving you with a mess."
+        exit 1
+    fi
+    exit 1
+}
+
+if [[ $SIMPLE_SWITCH -eq 0 ]]; then
+    . $(dirname "${BASH_SOURCE[0]}")/gitswitch "$TARGET_BRANCH"
 else
     #This indirect way of switching branches works-around a problem in Git
     # involving branches with submodules that are new to the local repo.
@@ -36,7 +50,6 @@ else
         echo "Did not find target branch $TARGET_BRANCH."
         exit 1
     fi
-
     COMMON_ANCESTOR=$(git merge-base $CURR_BRANCH origin/$TARGET_BRANCH)
     if [[ $? -ne 0 ]]; then
         echo "Target branch $TARGET_BRANCH does not already exist locally,"
@@ -44,29 +57,11 @@ else
         echo "This script cannot handle such a nuanced case -- you're on your own."
         exit 1
     fi
-
     #Create local branch pointing to our current commit, whatever that is.
     git checkout -b $TARGET_BRANCH
     if [[ $? -ne 0 ]]; then
         exit 1
     fi
-
-    function undoAndCleanupAndQuit {
-        git switch $CURR_BRANCH
-        if [[ $? -ne 0 ]]; then
-            echo "failed to switch back to your original branch."
-            echo "Aborting, and leaving you with a mess."
-            exit 1
-        fi
-        git branch -d $TARGET_BRANCH
-        if [[ $? -ne 0 ]]; then
-            echo "failed to clean up broken $TARGET_BRANCH."
-            echo "Aborting, and leaving you with a mess."
-            exit 1
-        fi
-        exit 1
-    }
-
     #Tell it that its destiny is to be a proper checkout of its corresponding remote branch.
     git branch --set-upstream-to=origin/$TARGET_BRANCH --quiet
     if [[ $? -ne 0 ]]; then
@@ -79,32 +74,36 @@ else
         echo "failed reset to common ancestor (part of a work-around for a quirk of git submodules)"
         undoAndCleanupAndQuit
     fi
-
     git merge --ff-only --quiet
     if [[ $? -ne 0 ]]; then
         echo "failed to fast-forward to tip of 'origin/$TARGET_BRANCH' (part of a work-around for a quirk of git submodules)"
         undoAndCleanupAndQuit
     fi
-    #Checkout appropriate version of submodules that Git's "laziness" has left out-of-sync.
-    for sm in $(git submodule status | grep "^+" | awk '{print $2}'); do
-        git checkout --quiet HEAD $sm
-        if [[ $? -ne 0 ]]; then
-            undoAndCleanupAndQuit
-        fi
-    done
-
-    #Init incoming submodules.
-    for sm in $(git submodule status | grep "^-" | awk '{print $2}'); do
-        git submodule update --init --recursive $sm
-        if [[ $? -ne 0 ]]; then
-            undoAndCleanupAndQuit
-        fi
-    done
 fi
 
+#This can be necessary, if a submodule was deleted vs the branch we came from.
+. $(dirname "${BASH_SOURCE[0]}")/gitclean
 
-git branch -d $CURR_BRANCH
-if [[ $? -ne 0 ]]; then
-    exit 1
+#Checkout appropriate version of submodules that Git's "laziness" has left out-of-sync.
+for sm in $(git submodule status | grep "^+" | awk '{print $2}'); do
+    git checkout --quiet HEAD $sm
+    if [[ $? -ne 0 ]]; then
+        undoAndCleanupAndQuit
+    fi
+done
+
+#Init incoming submodules.
+for sm in $(git submodule status | grep "^-" | awk '{print $2}'); do
+    git submodule update --init --recursive $sm
+    if [[ $? -ne 0 ]]; then
+        undoAndCleanupAndQuit
+    fi
+done
+
+#I'm using 0 to mean true here.
+if [[ $SIMPLE_SWITCH -ne 0 ]]; then
+    git branch -d $CURR_BRANCH
+    if [[ $? -ne 0 ]]; then
+        exit 1
+    fi
 fi
-
