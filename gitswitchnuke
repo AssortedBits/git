@@ -84,6 +84,22 @@ fi
 #This can be necessary, if a submodule was deleted vs the branch we came from.
 . $(dirname "${BASH_SOURCE[0]}")/gitclean
 
+#Makes sure URLs are correct -- Git is lazy about those.
+#Really, we need to do a sync-then-checkout recursively at each layer of submodule,
+# but I don't have the time to code that right now.
+#Cases should be rare, that aren't handled by this single recursive sync followed
+# by the checkout further below.
+git submodule --quiet sync --recursive
+if [[ $? -ne 0 ]]; then
+    undoAndCleanupAndQuit
+fi
+
+#Like I mentioned above, this can still fail if we have sub-sub-modules set
+# to the wrong hashes because of Git's "laziness", because the URL sync above
+# may not have set to the correct URL. That is, we might still be looking at
+# an "old" repo for some sub-sub-modules.
+. $(dirname "${BASH_SOURCE[0]}")/gitfetch
+
 #Checkout appropriate version of submodules that Git's "laziness" has left out-of-sync.
 for sm in $(git submodule status | grep "^+" | awk '{print $2}'); do
     git checkout --quiet HEAD $sm
@@ -99,12 +115,6 @@ for sm in $(git submodule status | grep "^-" | awk '{print $2}'); do
         undoAndCleanupAndQuit
     fi
 done
-
-#Makes sure URLs are correct -- Git is lazy about those.
-git submodule sync --recursive --quiet
-if [[ $? -ne 0 ]]; then
-    undoAndCleanupAndQuit
-fi
 
 #I'm using 0 to mean true here.
 if [[ $SIMPLE_SWITCH -ne 0 ]]; then
